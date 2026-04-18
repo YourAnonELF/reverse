@@ -14,7 +14,7 @@ HTML_PAGE = """<!doctype html>
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
   <title>Reverse-IP Domain Checker</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+    body { font-family: Arial, sans-serif; max-width: 75ch; margin: 2rem auto; padding: 0 1rem; }
     form { display: grid; gap: .75rem; margin-bottom: 1rem; }
     input { padding: .5rem; font-size: 1rem; }
     button { padding: .6rem .9rem; cursor: pointer; }
@@ -108,6 +108,7 @@ class Handler(BaseHTTPRequestHandler):
         self._send_json({"error": f"Not found: {html.escape(parsed.path)}"}, status=404)
 
     def log_message(self, *_):
+        """Suppress default HTTP request logging to keep console output clean."""
         return
 
 

@@ -2,7 +2,29 @@ import argparse
 import ipaddress
 import json
 import socket
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TypedDict
+
+
+class ReverseLookupResult(TypedDict):
+    success: bool
+    hostnames: List[str]
+    addresses: List[str]
+    error: Optional[str]
+
+
+class ForwardLookupResult(TypedDict):
+    success: bool
+    addresses: List[str]
+    error: Optional[str]
+
+
+class CheckResult(TypedDict):
+    ip: str
+    reverse: ReverseLookupResult
+    domain: Optional[str]
+    forward: Optional[ForwardLookupResult]
+    forward_matches_ip: Optional[bool]
+    reverse_matches_domain: Optional[bool]
 
 
 def validate_ip(ip: str) -> str:
@@ -10,7 +32,7 @@ def validate_ip(ip: str) -> str:
     return ip
 
 
-def reverse_lookup(ip: str) -> Dict[str, object]:
+def reverse_lookup(ip: str) -> ReverseLookupResult:
     validate_ip(ip)
     try:
         hostname, aliases, addresses = socket.gethostbyaddr(ip)
@@ -30,7 +52,7 @@ def reverse_lookup(ip: str) -> Dict[str, object]:
         }
 
 
-def forward_lookup(domain: str) -> Dict[str, object]:
+def forward_lookup(domain: str) -> ForwardLookupResult:
     try:
         _, _, addresses = socket.gethostbyname_ex(domain)
         return {
@@ -46,9 +68,9 @@ def forward_lookup(domain: str) -> Dict[str, object]:
         }
 
 
-def check_reverse_ip_domain(ip: str, domain: Optional[str] = None) -> Dict[str, object]:
+def check_reverse_ip_domain(ip: str, domain: Optional[str] = None) -> CheckResult:
     reverse = reverse_lookup(ip)
-    result: Dict[str, object] = {
+    result: CheckResult = {
         "ip": ip,
         "reverse": reverse,
         "domain": domain,
@@ -59,8 +81,12 @@ def check_reverse_ip_domain(ip: str, domain: Optional[str] = None) -> Dict[str, 
 
     if domain:
         forward = forward_lookup(domain)
-        reverse_names = {name.lower().rstrip('.') for name in reverse["hostnames"]}
-        domain_normalized = domain.lower().rstrip('.')
+        reverse_names = (
+            {name.lower().rstrip(".") for name in reverse["hostnames"]}
+            if reverse["success"]
+            else set()
+        )
+        domain_normalized = domain.lower().rstrip(".")
 
         result["forward"] = forward
         result["forward_matches_ip"] = ip in forward["addresses"] if forward["success"] else False
@@ -71,7 +97,7 @@ def check_reverse_ip_domain(ip: str, domain: Optional[str] = None) -> Dict[str, 
     return result
 
 
-def _print_terminal_result(result: Dict[str, object]) -> None:
+def _print_check_result_terminal(result: CheckResult) -> None:
     print(f"IP: {result['ip']}")
 
     reverse = result["reverse"]
@@ -94,7 +120,8 @@ def _print_terminal_result(result: Dict[str, object]) -> None:
                 print(f"- {addr}")
         else:
             print("Forward lookup: failed")
-            print(f"Error: {forward['error'] if forward else 'unknown error'}")
+            error_message = forward["error"] if forward is not None else "unknown error"
+            print(f"Error: {error_message}")
 
         print(f"Forward matches IP: {result['forward_matches_ip']}")
         print(f"Reverse matches domain: {result['reverse_matches_domain']}")
@@ -120,7 +147,7 @@ def main() -> None:
     if args.json:
         print(json.dumps(result, indent=2))
     else:
-        _print_terminal_result(result)
+        _print_check_result_terminal(result)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,10 @@ from unittest import mock
 from reverse_ip_checker import check_reverse_ip_domain, validate_ip
 
 
-class ReverseIpCheckerTests(unittest.TestCase):
+class TestReverseIpChecker(unittest.TestCase):
+    def test_validate_ip_accepts_valid(self):
+        self.assertEqual(validate_ip("127.0.0.1"), "127.0.0.1")
+
     def test_validate_ip_rejects_invalid(self):
         with self.assertRaises(ValueError):
             validate_ip("not-an-ip")
@@ -30,6 +33,19 @@ class ReverseIpCheckerTests(unittest.TestCase):
 
         self.assertFalse(result["reverse"]["success"])
         self.assertIn("lookup failed", result["reverse"]["error"])
+
+    @mock.patch("reverse_ip_checker.socket.gethostbyname_ex")
+    @mock.patch("reverse_ip_checker.socket.gethostbyaddr")
+    def test_forward_failure_with_domain(self, mock_reverse, mock_forward):
+        mock_reverse.return_value = ("example.com", [], ["1.2.3.4"])
+        mock_forward.side_effect = OSError("forward failed")
+
+        result = check_reverse_ip_domain("1.2.3.4", "example.com")
+
+        self.assertTrue(result["reverse"]["success"])
+        self.assertFalse(result["forward"]["success"])
+        self.assertFalse(result["forward_matches_ip"])
+        self.assertTrue(result["reverse_matches_domain"])
 
 
 if __name__ == "__main__":
